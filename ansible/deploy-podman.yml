@@ -1,0 +1,43 @@
+---
+- name: Desplegar aplicacion en Podman (VM)
+  hosts: web
+  become: yes
+
+  vars:
+    acr_login_server: "{{ lookup('env', 'ACR_LOGIN_SERVER') }}"
+    acr_username: "{{ lookup('env', 'ACR_USERNAME') }}"
+    acr_password: "{{ lookup('env', 'ACR_PASSWORD') }}"
+    image_full: "{{ acr_login_server }}/web-vm:casopractico2"
+    container_name: "web-vm"
+    host_http_port: "80"
+
+  tasks:
+    - name: Actualizar cache APT
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Instalar Podman
+      apt:
+        name: podman
+        state: present
+
+    - name: Login en Azure Container Registry
+      containers.podman.podman_login:
+        registry: "{{ acr_login_server }}"
+        username: "{{ acr_username }}"
+        password: "{{ acr_password }}"
+
+    - name: Descargar imagen desde ACR
+      containers.podman.podman_image:
+        name: "{{ image_full }}"
+        pull: yes
+
+    - name: Ejecutar contenedor web (80:80)
+      containers.podman.podman_container:
+        name: "{{ container_name }}"
+        image: "{{ image_full }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ host_http_port }}:80"
