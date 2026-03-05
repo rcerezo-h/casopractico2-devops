@@ -1,0 +1,37 @@
+---
+- name: Desplegar aplicación en AKS usando manifests (Kubernetes)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    rg_name: "rg-casopractico2"
+    aks_name: "aks-cp2"
+    manifests_dir: "./k8s"
+
+  tasks:
+    - name: Comprobar que kubectl está instalado
+      command: kubectl version --client
+      register: kubectl_check
+      changed_when: false
+      failed_when: false
+
+    - name: Instalar kubectl (snap) si no existe
+      become: yes
+      command: snap install kubectl --classic
+      when: kubectl_check.rc != 0
+
+    - name: Obtener credenciales de AKS (kubeconfig)
+      command: az aks get-credentials -g {{ rg_name }} -n {{ aks_name }} --overwrite-existing
+      register: aks_creds
+      changed_when: "'Merged' in aks_creds.stdout or 'Merged' in aks_creds.stderr"
+
+    - name: Aplicar Deployment
+      command: kubectl apply -f {{ manifests_dir }}/app-aks-deployment.yml
+      register: apply_deploy
+      changed_when: "'configured' in apply_deploy.stdout or 'created' in apply_deploy.stdout"
+
+    - name: Aplicar Service
+      command: kubectl apply -f {{ manifests_dir }}/app-aks-service.yml
+      register: apply_svc
+      changed_when: "'configured' in apply_svc.stdout or 'created' in apply_svc.stdout"
